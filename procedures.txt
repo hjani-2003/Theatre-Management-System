@@ -1,0 +1,390 @@
+1) Input Movie name from customer. Display movie name, movie language,show type,show time show duration,show date
+
+CREATE OR REPLACE FUNCTION movie_details (movieName varchar) 
+RETURNS TABLE (movie_Name VARCHAR, movie_Language VARCHAR, show_Type VARCHAR, show_Time TIME, show_Duration INT, show_Date DATE) AS
+$$
+BEGIN
+RETURN QUERY select movie.movie_name,movie.movie_language,show.show_type,show.show_time,show.show_duration,show.show_date from movie natural join show where movie.movie_id = show.movie_id and movie.movie_name = movieName order by show.show_time,show.show_date;
+END;
+$$
+LANGUAGE plpgsql;
+
+
+2) Input from desired show time and customer details. Display available seats,seat type, seat price, movie name, movie language,show type,show time show duration,show date for the show.
+
+CREATE OR REPLACE PROCEDURE customer_details (custName varchar, phoneNumber varchar, customerEmail varchar, custAddress varchar, inout i integer) 
+AS $$
+
+DECLARE 
+	cur_check cursor for select customer_name, phone_number from CUSTOMER;
+	rec_check record;
+
+BEGIN 
+	open cur_check;
+	loop
+		fetch cur_check into rec_check;
+		exit when not found;
+		if rec_check.customer_name = custName and rec_check.phone_number = phoneNumber then
+			i := 0;
+			return;
+			exit;
+		end if;
+	end loop;	
+	close cur_check;
+
+insert into customer(customer_name, phone_number, cust_email, cust_address) values (custName, phoneNumber, customerEmail, custAddress);
+return;
+
+END;
+$$
+language plpgsql;
+
+
+/* (seat INT, seat_Type VARCHAR, seat_Price INT, movie_Name VARCHAR, movie_language VARCHAR, show_Type VARCHAR, show_Time TIME, show_Duration INT, show_Date DATE) */
+
+CREATE OR REPLACE FUNCTION show_details (showID int)
+RETURNS TABLE (seat INT, seat_Type VARCHAR, seat_Price INT) AS
+$$
+BEGIN
+RETURN QUERY select seat.seat_id, seat.seat_type, seat.seat_price from seat where seat_id not in (select seat_no from booking_details natural join ticket_booking_order_details where booking_details.show_id = showID);
+END;
+$$
+LANGUAGE plpgsql;
+
+
+3) Input seat details. Display ticket bill
+
+
+CREATE OR REPLACE PROCEDURE ticket_details (custID INT, showID INT)
+AS 
+$$
+	
+DECLARE
+	num int;
+BEGIN
+	select movie_id into num from show where show_id = showID;
+	insert into booking_details(cust_id, movie_id, show_id) values (custID, num, showID);
+END;
+$$
+language plpgsql;
+
+
+CREATE OR REPLACE PROCEDURE ticket_details_2 (seatNO INT)
+AS 
+$$
+	
+DECLARE
+	num int;
+	cnt int:= 0;
+BEGIN
+	select count(*) into cnt from booking_details;
+	select seat_price into num from seat where seat_id = seatNO;
+	insert into ticket_booking_order_details(booking_id, seat_no, price) values (cnt, seatNO, num);
+END;
+$$
+language plpgsql;
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+CREATE OR REPLACE PROCEDURE ticket_details (bookingID INT, seat showID INT)
+AS 
+$$
+	
+DECLARE
+	num int;
+BEGIN
+	select movie_id into num from show where show_id = showID;
+	insert into booking_details(booking_id, cust_id, movie_id, show_id, price) values (bookingID, custID, num, showID, 0);
+END;
+$$
+language plpgsql;
+
+CREATE OR REPLACE PROCEDURE ticket_details_2 (SNO INT, bookingID INT, seatNO INT)
+AS 
+$$
+	
+DECLARE
+	num int;
+BEGIN
+	select seat_price into num from seat where seat_id = seatNO;
+	insert into ticket_booking_order_details(sno, booking_id, seat_no, price) values (SNO, bookingID, seatNO, num);
+END;
+$$
+language plpgsql;
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+CREATE OR REPLACE FUNCTION ticket_display_seat (bookingID INT)
+RETURNS TABLE (sno INT, seats INT, price INT, total_price INT, movie_name VARCHAR, show_id INT, cust_ID INT) AS
+$$
+
+DECLARE
+	cur_ticket cursor for  select distinct ticket_booking_order_details.seat_no SEATNO, ticket_booking_order_details.price PRICE from ticket_booking_order_details inner join booking_details on ticket_booking_order_details.booking_id = bookingID;
+	rec_ticket record;
+	totalPrice INT:= 0;
+	movieName VARCHAR;
+	showID INT;
+	custID INT;
+	i int:= 1;
+	tmpvar varchar:= 'done';
+
+BEGIN
+	select booking_details.cust_id into custID from booking_details where booking_details.booking_id = bookingID;
+	select booking_details.show_id into showID from booking_details where booking_details.booking_id = bookingID;
+	select movie.movie_name into movieName from movie natural join show where show.show_id = showID;
+	
+	open cur_ticket;
+	loop
+		fetch cur_ticket into rec_ticket;
+		exit when not found;
+			RETURN QUERY SELECT i,rec_ticket.SEATNO,rec_ticket.PRICE,0,tmpvar,0,0;
+			i := i+1;
+			totalPrice := totalPrice + rec_ticket.PRICE;
+	END LOOP;
+	RETURN QUERY SELECT 0, 0, 0, totalPrice, movieName, showID, custID;
+END;
+$$
+language plpgsql;
+
+
+4) Display food and take customer's order and ask for feedback
+
+CREATE OR REPLACE FUNCTION food_details() 
+RETURNS TABLE (food_Name VARCHAR, food_Price INT) AS
+$$
+BEGIN
+RETURN QUERY SELECT food.food_name, food.food_price FROM food;
+END;
+$$
+LANGUAGE plpgsql;
+
+
+
+CREATE OR REPLACE PROCEDURE food_order (custID INT)
+AS
+$$
+
+BEGIN
+insert into food_bill (cust_id, bill_date) VALUES (custID, CURRENT_DATE);
+
+END;
+$$
+language plpgsql;
+
+
+CREATE OR REPLACE PROCEDURE food_order_details (foodID INT, Quantity INT, rate INT)
+AS
+$$
+
+DECLARE
+	foodName VARCHAR;
+	foodPrice INT;
+	custID INT;
+	foodBillID INT;
+
+BEGIN
+select food_name into foodName from food where food_id = foodID;
+select count(*) into foodBillID from food_bill;
+select food_price into foodPrice from food where food_id = foodID;
+select cust_id into custID  from food_bill where food_bill_id = foodBillID;
+insert into food_order_details(food_bill_id, food_id, food_name, quantity, price) VALUES (foodBillID, foodID, foodName, Quantity, foodPrice);
+INSERT INTO feedback(cust_id, food_id, feedback_rating, feedback_date) values ( custID,foodID,rate,current_date);
+
+
+END;
+$$
+language plpgsql;
+
+
+5) Display food bill
+
+
+CREATE OR REPLACE FUNCTION food_bill_display (foodBillID INT)
+RETURNS TABLE  (sno INT, food_name VARCHAR, quantity INT, Price INT, total_price INT, custID INT, bill_date DATE, ttl_Price INT) AS
+$$
+
+DECLARE
+	cur_food cursor for select food_order_details.food_name foodName, food_order_details.quantity Quantity, food_order_details.price Price, food_bill.bill_date BillDATE from food_bill natural join food_order_details where food_order_details.food_bill_id = foodBillID;
+	rec_food record;
+	i int := 1;
+	cust_ID int;
+	total_price int:= 0;
+	donee varchar:= 'Done';
+
+BEGIN
+	select food_bill.cust_id into cust_ID from food_bill WHERE food_bill_id = foodBillID;
+	open cur_food;
+	loop
+		fetch cur_food into rec_food;
+		exit when not found;
+			RETURN QUERY SELECT i,rec_food.foodName, rec_food.Quantity, rec_food.Price, rec_food.Price*rec_food.Quantity, cust_ID, rec_food.BillDATE, 0;
+			total_price = total_price +  rec_food.Price*rec_food.Quantity;
+			i:= i + 1;
+	END LOOP;	
+	RETURN QUERY SELECT 0, donee, 0, 0, 0, 0, TO_DATE('2001/01/01', 'YYYY/MM/DD'), total_price;
+
+END;
+$$
+language plpgsql;
+
+
+6) Generate analysis for particular movie on a particular date and for a show of a movie also.......
+
+CREATE OR REPLACE FUNCTION shows_analysis (movieeName VARCHAR)
+RETURNS TABLE (movie_Name VARCHAR, show_id INT, seats_filled BIGINT, total_revenue BIGINT) AS
+$$
+
+DECLARE
+
+	movieName VARCHAR := movieeName;
+	
+	cur_show cursor for select distinct booking_details.show_id SHOWW, count(seat_no) SEATCOUNT, sum(price) PRICE from booking_details inner join ticket_booking_order_details on booking_details.movie_id = (select movie.movie_id from movie where movie.movie_name = movieName) where booking_details.booking_id = ticket_booking_order_details.booking_id group by booking_details.show_id order by PRICE desc;
+	
+	rec_show record;
+
+BEGIN
+	open cur_show;
+	loop
+		fetch cur_show into rec_show;
+		exit when not found;
+		RETURN QUERY SELECT movieName,rec_show.SHOWW, rec_show.SEATCOUNT, rec_show.PRICE;
+		
+	end loop;
+	
+END;
+$$
+language plpgsql;
+
+
+7) Display food sales analysis
+
+CREATE OR REPLACE FUNCTION food_sales_analysis () 
+RETURNS TABLE (food_name VARCHAR, quantity BIGINT, revenue BIGINT) AS
+$$
+
+DECLARE
+
+BEGIN
+	RETURN QUERY select food_order_details.food_name, sum(food_order_details.quantity) QTY, sum(food_order_details.quantity)*(select food.food_price from food where food.food_name = food_order_details.food_name) from food_order_details group by food_order_details.food_name order by QTY DESC;
+END;
+$$
+language plpgsql;
+
+
+8) Seat analysis and modifications in seat price
+
+CREATE OR REPLACE PROCEDURE update_food_price (fooddName VARCHAR, price INT)
+AS
+$$
+
+DECLARE
+	foodName VARCHAR := fooddName;
+
+BEGIN
+	UPDATE FOOD SET food_price = price WHERE food_name = foodName;
+END;
+$$
+language plpgsql;
+
+
+
+9) From feedback food analysis
+
+CREATE OR REPLACE FUNCTION food_rating_analysis () 
+RETURNS TABLE (food_name VARCHAR, avg_rating double precision) AS
+$$
+
+DECLARE
+
+BEGIN
+	RETURN QUERY select (SELECT food.food_name FROM FOOD where food.food_id = feedback.food_id) FOOD, CAST(sum(feedback.feedback_rating)/count(feedback.food_id) AS double precision ) AVERAGE from FEEDBACK group by feedback.food_id order by AVERAGE DESC;
+END;
+$$
+language plpgsql;
+
+
+
+CREATE OR REPLACE PROCEDURE update_seat_price (seat_start INT, seat_end INT, price INT, sseat_type VARCHAR)
+AS
+$$
+
+DECLARE
+	seatType VARCHAR := sseat_type ;
+BEGIN
+	for i in seat_start..seat_end loop
+		UPDATE SEAT SET seat_price = price, seat_type = seatType WHERE seat_id = i;
+	end loop;
+END;
+$$
+language plpgsql;
+
+
+
+10) theatre costing and revenue
+
+create table movie_cost (sno INT, movie_id int not null,movie_name varchar(30) not null,movie_cost INT not null, constraint pk_MCost_SNO primary key(sno), constraint fk_movieId foreign key(movie_id) references movie(movie_id));
+
+CREATE OR REPLACE FUNCTION my_profit (mmovieName VARCHAR)
+RETURNS TABLE (movie_name VARCHAR, price INT, earn INT, margin INT, p_or_l VARCHAR) AS
+$$
+
+DECLARE
+	movieName VARCHAR := mmovieName;
+	pricing INT;
+	earning INT;
+	sttt_1 VARCHAR := 'PROFIT';
+	sttt_2 VARCHAR := 'NO_PROFIT_NO_LOSS';
+	sttt_3 VARCHAR := 'LOSS';
+BEGIN
+	select movie_cost.movie_cost INTO pricing from movie_cost where movie_cost.movie_name = movieName;
+	select TAKE_ME.PRICE INTO earning from (select distinct booking_details.show_id SHOWW, count(ticket_booking_order_details.seat_no) SEATCOUNT, sum(ticket_booking_order_details.price) PRICE from booking_details inner join ticket_booking_order_details on booking_details.movie_id = (select movie.movie_id from movie where movie.movie_name = movieName) where booking_details.booking_id = ticket_booking_order_details.booking_id group by booking_details.show_id order by PRICE desc) TAKE_ME;
+	
+	if (earning-pricing)> 0 then
+		RETURN QUERY SELECT movieName,pricing,earning,(earning-pricing), sttt_1;
+	elsif (earning-pricing) = 0 then
+		RETURN QUERY SELECT movieName,pricing,earning,(earning-pricing), sttt_2;
+	else
+		RETURN QUERY SELECT movieName,pricing,earning,(earning-pricing), sttt_3;
+	end if;
+	
+
+END;
+$$
+language plpgsql;
+
+
+
+
+
+
+SELECT movie_details(movieName);
+
+call customer_details(custName, phoneNumber, customerEmail, custAddress, 1);
+
+select show_details (showID);
+
+call ticket_details (custID, showID);
+
+call ticket_details_2 (seatNO);
+
+select ticket_display_seat (bookingID);
+
+select food_details();
+
+call food_order (custID);
+
+call food_order_details (foodID, Quantity, rate);
+
+select food_bill_display (foodBillID INT);
+
+select shows_analysis (movieeName VARCHAR);
+
+select food_sales_analysis ();
+
+call update_food_price (fooddName, price);
+
+select food_rating_analysis () ;
+
+select update_seat_price (seat_start, seat_end, price, sseat_type)
+
+select my_profit (mmovieName);
+

@@ -1,0 +1,10 @@
+insert into movie_cost values (1,1,'RRR',1000);
+insert into movie_cost values (2,2,'Pathaan',1200);
+insert into movie_cost values (3,3,'FF',1500);
+insert into movie_cost values (4,4,'The Whale',1300);
+insert into movie_cost values (5,5,'The Last Show',1750);
+insert into movie_cost values (6,6,'KGF:Chapter:1',1600);
+insert into movie_cost values (7,7,'Chal Jevi Laiye',1250);
+insert into movie_cost values (8,8,'Drishyam 2',1450);
+insert into movie_cost values (9,9,'Free Guy',1550);
+insert into movie_cost values (10,10,'Pushpa',1900);

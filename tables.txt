@@ -1,0 +1,34 @@
+
+create table movie(movie_id int not null,movie_name varchar(30) not null,movie_language varchar(15) not null,movie_hour int not null,genre varchar(20),Description varchar (30),
+constraint pk_movieId primary key(movie_id));
+
+create table show(movie_id int not null,show_id int not null,show_type varchar(10) not null,show_time time not null,show_duration int not null,screen_no int not null,show_date date not null,
+constraint pk_showId primary key(show_id),
+constraint fk_movieId foreign key(movie_id) references movie(movie_id)
+);
+
+create table customer(cust_id int not null,customer_name varchar(30) not null,phone_number varchar(15) not null unique,cust_email varchar(50) unique,cust_address varchar(50),
+constraint pk_custId primary key(cust_id));
+create table seat(seat_id int not null,seat_price int not null,seat_type varchar(20) not null,
+constraint pk_seatId primary key(seat_id));
+
+create table food(food_id int not null,food_name varchar(20) not null, food_price int not null,
+constraint pk_foodId primary key(food_id));
+
+create table food_bill(food_bill_id int not null,cust_id int not null,bill_date date not null,
+constraint pk_foodBillId primary key(food_bill_id),
+constraint fk_custIdd foreign key(cust_id) references customer(cust_id));
+
+create table food_order_details(sno int not null,food_bill_id int not null,food_id int not null,food_name varchar(20) not null,quantity int not null,price int not null,
+constraint pk_snum primary key(sno),
+constraint fk_foodBillId foreign key(food_bill_id) references food_bill(food_bill_id),
+constraint fk_foodIdd foreign key(food_id) references food(food_id));
+
+create table booking_details(booking_id int not null, cust_id int not null, movie_id int not null, show_id int not null, price int not null, constraint pk_bookingid primary key(booking_id), constraint fk_custid foreign key(cust_id) references customer(cust_id), constraint fk_movieid foreign key(movie_id) references movie(movie_id), constraint fk_showid foreign key(show_id) references show(show_id));
+
+create table ticket_booking_order_details(sno int not null, booking_id int not null, seat_no int not null, price int not null, constraint pk_sno primary key(sno), constraint fk_bookingid foreign key(booking_id) references booking_details(booking_id), constraint fk_seatno foreign key(seat_no) references seat(seat_id));
+
+create table feedback(cust_id int not null,feedback_id int not null,food_id int not null,feedback_rating int not null,
+constraint pk_feedbackId primary key(feedback_id),
+constraint fk_custtId foreign key(cust_id) references customer(cust_id),
+constraint fk_fooodId foreign key(food_id) references food(food_id));
